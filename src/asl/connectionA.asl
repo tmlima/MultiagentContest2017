@@ -11,6 +11,7 @@ lowBattery :- role(_,_,_,Battery,_) & charge(Charge) & (Charge < (Battery*0.2)).
 buyingList([]).
 realLastAction(skip).
 
+
 +lastAction(Action) : lastActionResult(Result) & lastActionParams(Parameters) & 
 	not (Result = successful) & not (Action = randomFail) & not (Result = successful_partial)
 <-
