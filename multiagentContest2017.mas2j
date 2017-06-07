@@ -1,0 +1,12 @@
+MAS multiagentContest2017 {
+
+	infrastructure: Centralised
+	
+	environment: jason.eis.EISAdapter
+
+    agents:
+		connectionA #2;
+		
+	aslSourcePath:
+		"src/asl";
+}

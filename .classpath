@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry excluding="*.asl" kind="src" path="src/asl"/>
+	<classpathentry kind="src" path="src/java"/>
+	<classpathentry kind="src" path="test"/>
+	<classpathentry kind="lib" path="lib/jason-2.1.jar"/>
+	<classpathentry kind="lib" path="lib/eismassim-3.1-jar-with-dependencies.jar"/>
+	<classpathentry kind="lib" path="lib/eismassim-3.1.jar"/>
+	<classpathentry kind="lib" path="lib/server-2017-0.3-jar-with-dependencies.jar"/>
+	<classpathentry kind="lib" path="lib/server-2017-0.3.jar"/>
+	<classpathentry kind="output" path="bin/classes"/>
+</classpath>
