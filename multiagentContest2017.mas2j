@@ -5,7 +5,7 @@ MAS multiagentContest2017 {
 	environment: jason.eis.EISAdapter
 
     agents:
-		connectionA #2;
+		connectionA #6;
 		
 	aslSourcePath:
 		"src/asl";
