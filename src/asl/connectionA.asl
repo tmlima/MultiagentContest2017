@@ -6,9 +6,6 @@ shopsHasItem(Item,Qtd,[shop(IdShop,ItensShop) | ListOfShops],Temp,Result) :- sho
 shopsHasItem(Item,Qtd,[shop(IdShop,ItensShop) | ListOfShops],Temp,Result) :- shopsHasItem(Item,Qtd,ListOfShops,Temp,Result).
 shopsHasItem(Item,Qtd,Result) :- .findall(shop(IdShop,ItensShop),shop(IdShop,_,_,_,ItensShop),ListOfShops) & shopsHasItem(Item,Qtd,ListOfShops,[],Result).
 
-//stationsOrderedbyDistance :- .sort(.findall(charingStation(StationId, Distance), chargingStation(StationId,Lat,Lon), Stations), StationsOrdered)
-//lat(CurrentLat) & lon(CurrentLon)
-
 distanceHeuristic(TargetLat, TargetLon, Distance) :- lat(CurrentLat) & lon(CurrentLon) & Distance = 
 	math.sqrt(((TargetLat - CurrentLat) * (TargetLat - CurrentLat)) + ((TargetLon - CurrentLon) * (TargetLon - CurrentLon))).
 
@@ -70,22 +67,6 @@ realLastAction(skip).
 +doingJob(Name,_,_,_,_,_) 
 <- 
 	.print("I will do the job ", Name); 
-	
-	.findall(stationDistance(StationId, Distance), chargingStation(StationId,Lat,Lon,_) & distanceHeuristic(Lat, Lon, Distance), Stations);
-
-	// encontrar uma maneira de projetar somente as distancias em uma lista
-	// pegar o menor elemento da lista D
-	// pegar a estação com a distância D em Stations
-	
-	//	.min(.findall(D, Stations(_,D), L), NearestStationDistance);
-	//	?(Stations(NearestStationId, NearestStationDistance));
-	
-//	.length(Stations,X);
-//	.print("B: ", X);	
-// 	for ( .member(stationDistance(Id, D),Stations) ) {
-// 		.print("Id: ", Id, " D: ", D);
-//	}
-	
 	!decide_the_job_to_do.
 	
 @receivingJob[atomic]
@@ -157,11 +138,16 @@ realLastAction(skip).
 
 +!choose_my_action(Step) : discardItemAtDump(Item, _) & dump(DumpName,_,_) <- !goto_facility(DumpName).
 
-+!choose_my_action(Step) : lowBattery & chargingStation(ChargingStation,_,_,_) & charge(Charge)
++!choose_my_action(Step) : lowBattery & charge(Charge)
 <- 
 	.print("Battery is low: ", Charge);
-	!goto_facility(ChargingStation)
-	.
+	
+	.findall(stationDistance(StationId, Distance), chargingStation(StationId,Lat,Lon,_) & distanceHeuristic(Lat, Lon, Distance), Stations);
+	.findall(Distance, chargingStation(StationId,Lat,Lon,_) & distanceHeuristic(Lat, Lon, Distance), Distances);
+	.min(Distances, ShortestDistance);
+	?.member(stationDistance(NearestStation, ShortestDistance), Stations);
+
+	!goto_facility(NearestStation).
 	
 +!choose_my_action(Step) : hasItem(_,_) & doingJob(_,Storage,_,_,_,_)
 <-
