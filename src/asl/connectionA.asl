@@ -35,7 +35,7 @@ realLastAction(skip).
 @newJob[atomic]
 +job(Name,Storage,Reward,Begin,End,Requirements) : true <- !analise_job(Name,Storage,Reward,Begin,End,Requirements).
 	
-+!analise_job(Name,Storage,Reward,Begin,End,Requirements) : doingJob(_,_,_,_,_,_) 
++!analise_job(Name,Storage,Reward,Begin,End,Requirements) : executingJob(_,_,_,_,_,_) 
 <-
 	-job(Name,Storage,Reward,Begin,End,Requirements).
 
@@ -51,11 +51,11 @@ realLastAction(skip).
 	.	
 
 @callingAgents[atomic]
-+!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements) : not doingJob(_,_,_,_,_,_)
++!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements) : not executingJob(_,_,_,_,_,_)
 <-
 	.print("Calling the other agents to join me in the job ", Name);
-	.broadcast(tell,doingJob(Name,Storage,Reward,Begin,End,Requirements));
-	+doingJob(Name,Storage,Reward,Begin,End,Requirements);
+	.broadcast(tell,executingJob(Name,Storage,Reward,Begin,End,Requirements));
+	+executingJob(Name,Storage,Reward,Begin,End,Requirements);
 	-+buyingList(Requirements);
 	.
 
@@ -64,40 +64,40 @@ realLastAction(skip).
 //	.print("I will help in another job");
 //	.	
 
-+doingJob(Name,_,_,_,_,_) 
++executingJob(Name,_,_,_,_,_) 
 <- 
 	.print("I will do the job ", Name); 
 	!decide_the_job_to_do.
 	
 @receivingJob[atomic]
-+!decide_the_job_to_do : .findall(Name,doingJob(Name,_,_,_,_,_),Jobs)
++!decide_the_job_to_do : .findall(Name,executingJob(Name,_,_,_,_,_),Jobs)
 <- 
 	.sort(Jobs,NewListSorted);
 	
 	.length(NewListSorted,Length);
 	for ( .range(I,1,(Length-1)) ) {
         .nth(I,NewListSorted,Source);
-        -doingJob(Name,_,_,_,_,_);
+        -executingJob(Name,_,_,_,_,_);
      }
      
-     ?doingJob(_,_,_,_,_,Requirements);
+     ?executingJob(_,_,_,_,_,Requirements);
      -+buyingList(Requirements);
 	.
 	
 +jobCompleted(Name)[source(Agent)] : true
 <- 
 	.print(Agent, " told me job ", Name, " is complete");
-	.abolish(doingJob(Name,_,_,_,_,_));
+	.abolish(executingJob(Name,_,_,_,_,_));
 	-jobCompleted(Name)[source(Agent)];
 	.
 
 +bye <- .print("### Simulation has finished ###").
 
-+lastAction(deliver_job) : lastActionResult(successful) & doingJob(Name,_,_,_,_,_)
++lastAction(deliver_job) : lastActionResult(successful) & executingJob(Name,_,_,_,_,_)
 <-
 	.print("Job ", Name, " completed!");
 	.broadcast(tell,jobCompleted(Name));
-	.abolish(doingJob(Name,_,_,_,_,_));
+	.abolish(executingJob(Name,_,_,_,_,_));
 	.
 
 +lastAction(buy)  : lastActionResult(successful) & buying & lastActionParams([Item,Quantity]) 
@@ -149,13 +149,13 @@ realLastAction(skip).
 
 	!goto_facility(NearestStation).
 	
-+!choose_my_action(Step) : hasItem(_,_) & doingJob(_,Storage,_,_,_,_)
++!choose_my_action(Step) : hasItem(_,_) & executingJob(_,Storage,_,_,_,_)
 <-
 	.print("Going delivery item at ",Storage);	
 	!goto_facility(Storage);
 	.
 	
-+!choose_my_action(Step) : doingJob(_,_,_,_,_,_) & not buyingList([]) & buyingList(Requirements) & not hasItem(_,_)
++!choose_my_action(Step) : executingJob(_,_,_,_,_,_) & not buyingList([]) & buyingList(Requirements) & not hasItem(_,_)
 <-
 	.nth(0,Requirements,required(Item, Quantity));
 	!choose_shop_to_go_buying(Step, Item, Quantity);
@@ -222,7 +222,7 @@ realLastAction(skip).
 	.print("Buying list is empty")
 	.
 	
-+!what_to_do_in_facility(Facility, Step) : storage(Facility,_,_,_,_,_) & doingJob(Name,_,_,_,_,_) & hasItem(Item, Quantity)
++!what_to_do_in_facility(Facility, Step) : storage(Facility,_,_,_,_,_) & executingJob(Name,_,_,_,_,_) & hasItem(Item, Quantity)
 <- 
 	.print("Delivering ",Quantity, " of ", Item, " on ", Facility);
 	!perform_action(deliver_job(Name));
