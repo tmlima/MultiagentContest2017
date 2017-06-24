@@ -43,12 +43,19 @@ realLastAction(skip).
 <- 
 	-job(Name, Storage, Reward, Begin, End, Requirements).
 
-+!analise_job(Name,Storage,Reward,Begin,End,Requirements) : true
++!analise_job(Name,Storage,Reward,Begin,End,Requirements) : Reward >= 500
 <-
 	.print("Job ", Name, " analyzed and accepted");	
 	!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements);
 	-job(Name,Storage,Reward,Begin,End,Requirements);	
 	.	
+
++!analise_job(Name,Storage,Reward,Begin,End,Requirements) : Reward < 500
+<-
+	.print("Job ", Name, " reject. Reward is too low");	
+	-job(Name,Storage,Reward,Begin,End,Requirements);	
+	.	
+
 
 @callingAgents[atomic]
 +!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements) : not executingJob(_,_,_,_,_,_)
@@ -219,7 +226,8 @@ realLastAction(skip).
 
 +!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & buyingList([])
 <-
-	.print("Buying list is empty")
+	.print("Buying list is empty. Waiting for another job");
+	-executingJob(_,_,_,_,_,_)
 	.
 	
 +!what_to_do_in_facility(Facility, Step) : storage(Facility,_,_,_,_,_) & executingJob(Name,_,_,_,_,_) & hasItem(Item, Quantity)
@@ -234,7 +242,7 @@ realLastAction(skip).
 	+discardItemAtDump(Item, Quantity)
 	.		
 
-+!what_to_do_in_facility(Facility, Step) : discardItemAtDump(Item, Quantity) & dump(Facility,_,_)
++!what_to_do_in_facility(Facility, Step) : discardItemAtDump(Item, Quantity) & dump(Facility,_,_) & hasItem(Item, Quantity)
 <-
 	.print("Discarding ", Item, " at ", Facility);
 	dump(Item, Quantity)
