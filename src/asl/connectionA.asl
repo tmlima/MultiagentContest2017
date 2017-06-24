@@ -1,6 +1,5 @@
 
 shopHasItem(Item,Qtd,ListOfItens) :- .member(item(Item,_,QtdInShop),ListOfItens) & (Qtd <= QtdInShop).
-
 shopsHasItem(Item,Qtd,[],Temp,Result) :- Result = Temp.
 shopsHasItem(Item,Qtd,[shop(IdShop,ItensShop) | ListOfShops],Temp,Result) :- shopHasItem(Item,Qtd,ItensShop) & shopsHasItem(Item,Qtd,ListOfShops,[IdShop | Temp],Result).
 shopsHasItem(Item,Qtd,[shop(IdShop,ItensShop) | ListOfShops],Temp,Result) :- shopsHasItem(Item,Qtd,ListOfShops,Temp,Result).
@@ -14,6 +13,12 @@ lowBattery :- role(_,_,_,Battery,_) & charge(Charge) & (Charge < (Battery*0.2)).
 buyingList([]).
 realLastAction(skip).
 
++lastAction(Action) : lastActionResult(Result) & lastActionParams(Parameters) & 
+	(Result = useless) & not (Action = randomFail) & not (Result = successful_partial) & hasItem(Item, Quantity) 
+<-
+	.print("Item was already delivered. Discarding...");
+	+discardItemAtDump(Item, Quantity)
+	.
 
 +lastAction(Action) : lastActionResult(Result) & lastActionParams(Parameters) & 
 	not (Result = successful) & not (Action = randomFail) & not (Result = successful_partial)
@@ -23,9 +28,10 @@ realLastAction(skip).
 	.print("Action result: ", Result);
 	.
 
++charge(0) <- +chargingSolarPanels.
+
 @updateBuyingList[atomic]
-+buyingList(List)[source(Agent)]
-	: (Agent \== self)
++buyingList(List)[source(Agent)] : (Agent \== self) 
 <-
 	.print("Updating buying list");
 	-buyingList(List)[source(Agent)];
@@ -66,45 +72,26 @@ realLastAction(skip).
 	-+buyingList(Requirements);
 	.
 
-//+!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements) : true
-//<-
-//	.print("I will help in another job");
-//	.	
-
-+executingJob(Name,_,_,_,_,_) 
++executingJob(Name,_,_,_,_,Requirements) : not executingJob(_,_,_,_,_,_)
 <- 
 	.print("I will do the job ", Name); 
-	!decide_the_job_to_do.
-	
-@receivingJob[atomic]
-+!decide_the_job_to_do : .findall(Name,executingJob(Name,_,_,_,_,_),Jobs)
-<- 
-	.sort(Jobs,NewListSorted);
-	
-	.length(NewListSorted,Length);
-	for ( .range(I,1,(Length-1)) ) {
-        .nth(I,NewListSorted,Source);
-        -executingJob(Name,_,_,_,_,_);
-     }
-     
-     ?executingJob(_,_,_,_,_,Requirements);
      -+buyingList(Requirements);
-	.
+	.	
 	
 +jobCompleted(Name)[source(Agent)] : true
 <- 
 	.print(Agent, " told me job ", Name, " is complete");
 	.abolish(executingJob(Name,_,_,_,_,_));
+	-going;
 	-jobCompleted(Name)[source(Agent)];
 	.
-
-+bye <- .print("### Simulation has finished ###").
 
 +lastAction(deliver_job) : lastActionResult(successful) & executingJob(Name,_,_,_,_,_)
 <-
 	.print("Job ", Name, " completed!");
 	.broadcast(tell,jobCompleted(Name));
 	.abolish(executingJob(Name,_,_,_,_,_));
+	-going
 	.
 
 +lastAction(buy)  : lastActionResult(successful) & buying & lastActionParams([Item,Quantity]) 
@@ -114,9 +101,14 @@ realLastAction(skip).
 	.
 
 +charge(C) : role(_,_,_,ChargeCapacity,_) & (C = ChargeCapacity) & charging
-<-
+<- 
 	.print("Full charged");
 	-charging.
+
++charge(C) : role(_,_,_,ChargeCapacity,_) & (C = ChargeCapacity) & chargingSolarPanels
+<- 
+	.print("Full charged");
+	-chargingSolarPanels.
 
 +step(X) : true <- !choose_my_action(X).
 
@@ -130,7 +122,13 @@ realLastAction(skip).
 <-
 	!what_to_do_in_facility(ChargingStation, Step)
 	.
-	
+
++!choose_my_action(Step) : chargingSolarPanels & charge(Charge)
+<-
+	.print("Recharing using solar panels ", Charge);
+	!perform_action(recharge)
+	.
+
 +!choose_my_action(Step) : going(Destination) & facility(Facility) & (Destination == Facility)
 <-
 	-going(Destination);
@@ -144,17 +142,6 @@ realLastAction(skip).
 	.
 
 +!choose_my_action(Step) : discardItemAtDump(Item, _) & dump(DumpName,_,_) <- !goto_facility(DumpName).
-
-+!choose_my_action(Step) : lowBattery & charge(Charge)
-<- 
-	.print("Battery is low: ", Charge);
-	
-	.findall(stationDistance(StationId, Distance), chargingStation(StationId,Lat,Lon,_) & distanceHeuristic(Lat, Lon, Distance), Stations);
-	.findall(Distance, chargingStation(StationId,Lat,Lon,_) & distanceHeuristic(Lat, Lon, Distance), Distances);
-	.min(Distances, ShortestDistance);
-	?.member(stationDistance(NearestStation, ShortestDistance), Stations);
-
-	!goto_facility(NearestStation).
 	
 +!choose_my_action(Step) : hasItem(_,_) & executingJob(_,Storage,_,_,_,_)
 <-
@@ -167,12 +154,6 @@ realLastAction(skip).
 	.nth(0,Requirements,required(Item, Quantity));
 	!choose_shop_to_go_buying(Step, Item, Quantity);
 	.
-
-//+!choose_my_action(Step) : role(_,_,_,Battery,_) & charge(Charge) & (Charge < Battery) & storage(Facility,_,_,_,_,_)
-//<-
-//	.print("Recharging at step ",Step);
-//	!perform_action(recharge);
-//	.
 	
 +!choose_my_action(Step) :true
 <-
@@ -186,14 +167,7 @@ realLastAction(skip).
 <-
 	+going(Facility);
 	!perform_action(goto(Facility));	
-//	.print("Going to ",Facility);	
 	.
-
-//+!recharge_vehicle(Step)
-//<- 
-//	.print("Recharging at ",Step);
-//	!perform_action(charge);
-//	.
 
 +!choose_shop_to_go_buying(Step, Item, Quantity) : shop(Shop,_,_,_,ShopItems) & .member(item(Item,_,StockQuantity),ShopItems) & (Quantity <= StockQuantity)
 <-
@@ -208,16 +182,12 @@ realLastAction(skip).
 	+buying
 	.
 	
-//+!choose_item_to_buy(Step) : buyingList(Requirements) & .member(required(Item,Qtd),Requirements) & shopsHasItem(Item,Qtd,ShopList)
-//<-
-//	!choose_shop_to_go_buying(Step);
-//	.
-
 +!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_) & (C < ChargeCapacity)
 <-
 	.print("Charging: ",C);
 	+charging;
-	!perform_action(charge).
+	!perform_action(charge)
+	.
 
 +!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & not buyingList([])
 <- 
@@ -245,7 +215,8 @@ realLastAction(skip).
 +!what_to_do_in_facility(Facility, Step) : discardItemAtDump(Item, Quantity) & dump(Facility,_,_) & hasItem(Item, Quantity)
 <-
 	.print("Discarding ", Item, " at ", Facility);
-	dump(Item, Quantity)
+	dump(Item, Quantity);
+	-discardItemAtDump
 	.
 
 +!perform_action(continue) <- continue.
