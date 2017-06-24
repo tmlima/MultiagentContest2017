@@ -39,29 +39,12 @@ realLastAction(skip).
 	.
 
 @newJob[atomic]
-+job(Name,Storage,Reward,Begin,End,Requirements) : true <- !analise_job(Name,Storage,Reward,Begin,End,Requirements).
-	
-+!analise_job(Name,Storage,Reward,Begin,End,Requirements) : executingJob(_,_,_,_,_,_) 
-<-
-	-job(Name,Storage,Reward,Begin,End,Requirements).
-
-+!analise_job(Name,Storage,Reward,Begin,End,Requirements) : charging
-<- 
-	-job(Name, Storage, Reward, Begin, End, Requirements).
-
-+!analise_job(Name,Storage,Reward,Begin,End,Requirements) : Reward >= 500
++job(Name,Storage,Reward,Begin,End,Requirements) : Reward >= 500 & not executingJob(_,_,_,_,_,_) & not charging
 <-
 	.print("Job ", Name, " analyzed and accepted");	
+	-job(Name,Storage,Reward,Begin,End,Requirements);	
 	!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements);
-	-job(Name,Storage,Reward,Begin,End,Requirements);	
 	.	
-
-+!analise_job(Name,Storage,Reward,Begin,End,Requirements) : Reward < 500
-<-
-	.print("Job ", Name, " reject. Reward is too low");	
-	-job(Name,Storage,Reward,Begin,End,Requirements);	
-	.	
-
 
 @callingAgents[atomic]
 +!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements) : not executingJob(_,_,_,_,_,_)
@@ -84,6 +67,7 @@ realLastAction(skip).
 	.abolish(executingJob(Name,_,_,_,_,_));
 	-going;
 	-jobCompleted(Name)[source(Agent)];
+	-waitingForJobBeComplete;
 	.
 
 +lastAction(deliver_job) : lastActionResult(successful) & executingJob(Name,_,_,_,_,_)
@@ -97,7 +81,6 @@ realLastAction(skip).
 +lastAction(buy)  : lastActionResult(successful) & buying & lastActionParams([Item,Quantity]) 
 <-
 	-buying
-	!updateBuyingList(Item,Quantity);
 	.
 
 +charge(C) : role(_,_,_,ChargeCapacity,_) & (C = ChargeCapacity) & charging
@@ -172,6 +155,7 @@ realLastAction(skip).
 +!choose_shop_to_go_buying(Step, Item, Quantity) : shop(Shop,_,_,_,ShopItems) & .member(item(Item,_,StockQuantity),ShopItems) & (Quantity <= StockQuantity)
 <-
 	.print("Going to buy ", Item, " on ", Shop);
+	!updateBuyingList(Item,Quantity);
 	!goto_facility(Shop);
 	.
 
@@ -197,7 +181,7 @@ realLastAction(skip).
 +!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & buyingList([])
 <-
 	.print("Buying list is empty. Waiting for another job");
-	-executingJob(_,_,_,_,_,_)
+	+waitingForJobBeComplete;
 	.
 	
 +!what_to_do_in_facility(Facility, Step) : storage(Facility,_,_,_,_,_) & executingJob(Name,_,_,_,_,_) & hasItem(Item, Quantity)
