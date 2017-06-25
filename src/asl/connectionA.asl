@@ -10,6 +10,8 @@ distanceHeuristic(TargetLat, TargetLon, Distance) :- lat(CurrentLat) & lon(Curre
 
 lowBattery :- role(_,_,_,Battery,_) & charge(Charge) & (Charge < (Battery*0.2)).
 
+otherAgentHasPriority(Self, OtherAgent) :- .min([Self, OtherAgent], Priority) & Priority = OtherAgent.
+
 buyingList([]).
 realLastAction(skip).
 
@@ -30,36 +32,40 @@ realLastAction(skip).
 
 +charge(0) <- +chargingSolarPanels.
 
-@updateBuyingList[atomic]
-+buyingList(List)[source(Agent)] : (Agent \== self) 
-<-
-	.print("Updating buying list");
-	-buyingList(List)[source(Agent)];
-	-+buyingList(List)[source(self)];
-	.
-
 @newJob[atomic]
-+job(Name,Storage,Reward,Begin,End,Requirements) : Reward >= 500 & not executingJob(_,_,_,_,_,_) & not charging
++job(Name,Storage,Reward,Begin,End,Requirements) : Reward >= 500 & not currentJob(_,_,_,_,_,_) & not charging & not executingJob(Name,_,_,_,_,_)
 <-
 	.print("Job ", Name, " analyzed and accepted");	
 	-job(Name,Storage,Reward,Begin,End,Requirements);	
-	!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements);
+	!inform_other_agents(Name,Storage,Reward,Begin,End,Requirements);
 	.	
 
-@callingAgents[atomic]
-+!call_the_other_agents(Name,Storage,Reward,Begin,End,Requirements) : not executingJob(_,_,_,_,_,_)
+@informingAgents[atomic]
++!inform_other_agents(Name,Storage,Reward,Begin,End,Requirements) : simStart[entity(Self),_] 
 <-
-	.print("Calling the other agents to join me in the job ", Name);
-	.broadcast(tell,executingJob(Name,Storage,Reward,Begin,End,Requirements));
-	+executingJob(Name,Storage,Reward,Begin,End,Requirements);
+	.broadcast(tell,executingJob(Self, Name,Storage,Reward,Begin,End,Requirements));
+	-currentJob(_,_,_,_,_,_);
+	+currentJob(Name,Storage,Reward,Begin,End,Requirements);
 	-+buyingList(Requirements);
 	.
 
-+executingJob(Name,_,_,_,_,Requirements) : not executingJob(_,_,_,_,_,_)
++executingJob(Agent, Name,Storage,Reward,Begin,End,Requirements) : simStart[entity(Self),_] & (Agent \== Self) & currentJob(Name,_,_,_,_,_) & otherAgentHasPriority(Self, Agent)
 <- 
-	.print("I will do the job ", Name); 
-     -+buyingList(Requirements);
+	.print("I quit job ", Name, " because ", Agent, " is doing it"); 
+	.abolish(currentJob(Name,_,_,_,_,_));
+	.abolish(going(_));
+	!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements)
 	.	
+
++executingJob(Agent, Name,Storage,Reward,Begin,End,Requirements) : simStart[entity(Self),_] & (Agent \== Self)
+<-
+	!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements).
+
++!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements)
+<-
+	.abolish(executingJob(Agent,_,_,_,_,_,_));
+	+executingJob(Agent, Name,Storage,Reward,Begin,End,Requirements)
+	.
 	
 +jobCompleted(Name)[source(Agent)] : true
 <- 
@@ -70,24 +76,20 @@ realLastAction(skip).
 	-waitingForJobBeComplete;
 	.
 
-+lastAction(deliver_job) : lastActionResult(successful) & executingJob(Name,_,_,_,_,_)
++lastAction(deliver_job) : lastActionResult(successful) & currentJob(Name,_,_,_,_,_)
 <-
 	.print("Job ", Name, " completed!");
 	.broadcast(tell,jobCompleted(Name));
-	.abolish(executingJob(Name,_,_,_,_,_));
+	.abolish(currentJob(Name,_,_,_,_,_));
 	-going
 	.
 
 +lastAction(buy)  : lastActionResult(successful) & buying & lastActionParams([Item,Quantity]) 
 <-
 	-buying
+	!updateBuyingList(Item,Quantity);
 	.
-
-+charge(C) : role(_,_,_,ChargeCapacity,_) & (C = ChargeCapacity) & charging
-<- 
-	.print("Full charged");
-	-charging.
-
+	
 +charge(C) : role(_,_,_,ChargeCapacity,_) & (C = ChargeCapacity) & chargingSolarPanels
 <- 
 	.print("Full charged");
@@ -119,20 +121,32 @@ realLastAction(skip).
 	!what_to_do_in_facility(Facility, Step);
 	.
 
++!choose_my_action(Step) : discardItemAtDump(Item, _) & dump(DumpName,_,_) <- !goto_facility(DumpName).
+
++!choose_my_action(Step) : lowBattery & charge(Charge) & not goingToChargeStation
+<- 
+	.print("Battery is low: ", Charge);
+	
+	.findall(stationDistance(StationId, Distance), chargingStation(StationId,Lat,Lon,_) & distanceHeuristic(Lat, Lon, Distance), Stations);
+	.findall(Distance, chargingStation(StationId,Lat,Lon,_) & distanceHeuristic(Lat, Lon, Distance), Distances);
+	.min(Distances, ShortestDistance);
+	?.member(stationDistance(NearestStation, ShortestDistance), Stations);
+	+goingToChargeStation;
+	!goto_facility(NearestStation)
+	.
+
 +!choose_my_action(Step) : going(Destination)
 <-
 	!perform_action(continue);
 	.
-
-+!choose_my_action(Step) : discardItemAtDump(Item, _) & dump(DumpName,_,_) <- !goto_facility(DumpName).
 	
-+!choose_my_action(Step) : hasItem(_,_) & executingJob(_,Storage,_,_,_,_)
++!choose_my_action(Step) : hasItem(_,_) & currentJob(_,Storage,_,_,_,_)
 <-
 	.print("Going delivery item at ",Storage);	
 	!goto_facility(Storage);
 	.
 	
-+!choose_my_action(Step) : executingJob(_,_,_,_,_,_) & not buyingList([]) & buyingList(Requirements) & not hasItem(_,_)
++!choose_my_action(Step) : currentJob(_,_,_,_,_,_) & not buyingList([]) & buyingList(Requirements) & not hasItem(_,_)
 <-
 	.nth(0,Requirements,required(Item, Quantity));
 	!choose_shop_to_go_buying(Step, Item, Quantity);
@@ -144,8 +158,6 @@ realLastAction(skip).
 	!perform_action(skip);
 	.
 
-+!goto_facility(Facility) : Facility <- .print("There's no where to go").
-
 +!goto_facility(Facility) : true
 <-
 	+going(Facility);
@@ -155,7 +167,6 @@ realLastAction(skip).
 +!choose_shop_to_go_buying(Step, Item, Quantity) : shop(Shop,_,_,_,ShopItems) & .member(item(Item,_,StockQuantity),ShopItems) & (Quantity <= StockQuantity)
 <-
 	.print("Going to buy ", Item, " on ", Shop);
-	!updateBuyingList(Item,Quantity);
 	!goto_facility(Shop);
 	.
 
@@ -169,8 +180,16 @@ realLastAction(skip).
 +!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_) & (C < ChargeCapacity)
 <-
 	.print("Charging: ",C);
+	-goingToChargeStation;
 	+charging;
 	!perform_action(charge)
+	.
+
++!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_)  & (C = ChargeCapacity) & charging & going(Destiny) 
+<- 
+	.print("Full charged at ", Facility);
+	-charging;
+	!goto_facility(Destiny)
 	.
 
 +!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & not buyingList([])
@@ -184,7 +203,7 @@ realLastAction(skip).
 	+waitingForJobBeComplete;
 	.
 	
-+!what_to_do_in_facility(Facility, Step) : storage(Facility,_,_,_,_,_) & executingJob(Name,_,_,_,_,_) & hasItem(Item, Quantity)
++!what_to_do_in_facility(Facility, Step) : storage(Facility,_,_,_,_,_) & currentJob(Name,_,_,_,_,_) & hasItem(Item, Quantity)
 <- 
 	.print("Delivering ",Quantity, " of ", Item, " on ", Facility);
 	!perform_action(deliver_job(Name));
@@ -215,7 +234,6 @@ realLastAction(skip).
 <-
 	.print("Removing ", Item, " from buying list");
 	.delete(required(Item,Qtd),List,NewList);
-	.broadcast(tell,buyingList(NewList));
 	-+buyingList(NewList);
 	.
 	
