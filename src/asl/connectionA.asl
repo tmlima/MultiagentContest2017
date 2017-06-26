@@ -33,12 +33,16 @@ realLastAction(skip).
 +charge(0) <- +chargingSolarPanels.
 
 @newJob[atomic]
-+job(Name,Storage,Reward,Begin,End,Requirements) : Reward >= 500 & not currentJob(_,_,_,_,_,_) & not charging & not executingJob(Name,_,_,_,_,_)
++job(Name,Storage,Reward,Begin,End,Requirements) <- !analyseJob(Name,Storage,Reward,Begin,End,Requirements).
+
++!analyseJob(Name,Storage,Reward,Begin,End,Requirements) : Reward >= 500 & not currentJob(_,_,_,_,_,_) & not charging & not executingJob(Name,_,_,_,_,_)
 <-
 	.print("Job ", Name, " analyzed and accepted");	
 	-job(Name,Storage,Reward,Begin,End,Requirements);	
 	!inform_other_agents(Name,Storage,Reward,Begin,End,Requirements);
 	.	
+
++!analyseJob(Name,Storage,Reward,Begin,End,Requirements) <- -job(Name,Storage,Reward,Begin,End,Requirements).
 
 @informingAgents[atomic]
 +!inform_other_agents(Name,Storage,Reward,Begin,End,Requirements) : simStart[entity(Self),_] 
@@ -54,6 +58,7 @@ realLastAction(skip).
 	.print("I quit job ", Name, " because ", Agent, " is doing it"); 
 	.abolish(currentJob(Name,_,_,_,_,_));
 	.abolish(going(_));
+	-+buyingList([]);
 	!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements)
 	.	
 
@@ -121,7 +126,7 @@ realLastAction(skip).
 	!what_to_do_in_facility(Facility, Step);
 	.
 
-+!choose_my_action(Step) : discardItemAtDump(Item, _) & dump(DumpName,_,_) <- !goto_facility(DumpName).
++!choose_my_action(Step) : discardItemAtDump(Item, _) & dump(DumpName,_,_) & hasItem(Item,_) <- !goto_facility(DumpName).
 
 +!choose_my_action(Step) : lowBattery & charge(Charge) & not goingToChargeStation
 <- 
@@ -209,18 +214,18 @@ realLastAction(skip).
 	!perform_action(deliver_job(Name));
 	.
 
-+!what_to_do_in_facility(Facility, Step) : hasItem(Item, Quantity) & buyingList(Requirements) & not .member(required(Item,_), Requirements)
-<- 
-	.print("Item ", Item, " was already delivered");
-	+discardItemAtDump(Item, Quantity)
-	.		
-
 +!what_to_do_in_facility(Facility, Step) : discardItemAtDump(Item, Quantity) & dump(Facility,_,_) & hasItem(Item, Quantity)
 <-
 	.print("Discarding ", Item, " at ", Facility);
 	dump(Item, Quantity);
 	-discardItemAtDump
 	.
+
++!what_to_do_in_facility(Facility, Step) : hasItem(Item, Quantity) & buyingList(Requirements) & not .member(required(Item,_), Requirements)
+<- 
+	.print("Item ", Item, " was already delivered");
+	+discardItemAtDump(Item, Quantity)
+	.		
 
 +!perform_action(continue) <- continue.
 
