@@ -12,6 +12,14 @@ lowBattery :- role(_,_,_,Battery,_) & charge(Charge) & (Charge < (Battery*0.2)).
 
 otherAgentHasPriority(Self, OtherAgent) :- .min([Self, OtherAgent], Priority) & Priority = OtherAgent.
 
+sumItemsPrice([item(_,Price,_) | Tail], Maximum, Sum) :- (Sum + Price) = NewSum & (NewSum <= Maximum) & sumItemsPrice(Tail, Maximum, NewSum).
+sumItemsPrice([], Maximum, NewSum) :- true.
+
+jobWorthIt(Reward, RequiredItems) :- jobWorthIt(Reward, RequiredItems, 0).
+jobWorthIt(Reward, [required(Item, Quantity)| Tail], Sum) :- shop(_,_,_,_,Items) &  .member(item(Item,Price,Q), Items)
+	& ((Price * Quantity) + Sum) = NewSum & (NewSum < Reward)  & jobWorthIt(Reward, Tail, NewSum).
+jobWorthIt(Reward, [], Sum) :- (Reward - Sum) > 150.	
+
 buyingList([]).
 realLastAction(skip).
 
@@ -35,7 +43,7 @@ realLastAction(skip).
 @newJob[atomic]
 +job(Name,Storage,Reward,Begin,End,Requirements) <- !analyseJob(Name,Storage,Reward,Begin,End,Requirements).
 
-+!analyseJob(Name,Storage,Reward,Begin,End,Requirements) : Reward >= 500 & not currentJob(_,_,_,_,_,_) & not charging & not executingJob(Name,_,_,_,_,_)
++!analyseJob(Name,Storage,Reward,Begin,End,Requirements) : jobWorthIt(Reward, Requirements) & not currentJob(_,_,_,_,_,_) & not charging & not executingJob(Name,_,_,_,_,_)
 <-
 	.print("Job ", Name, " analyzed and accepted");	
 	-job(Name,Storage,Reward,Begin,End,Requirements);	
