@@ -10,6 +10,8 @@ distanceHeuristic(TargetLat, TargetLon, Distance) :- lat(CurrentLat) & lon(Curre
 
 lowBattery :- role(_,_,_,Battery,_) & charge(Charge) & (Charge < (Battery*0.2)).
 
+fullCharged :- charge(Charge) & role(_,_,_,ChargeCapacity,_) & (Charge = ChargeCapacity).
+
 otherAgentHasPriority(Self, OtherAgent) :- .min([Self, OtherAgent], Priority) & Priority = OtherAgent.
 
 sumItemsPrice([item(_,Price,_) | Tail], Maximum, Sum) :- (Sum + Price) = NewSum & (NewSum <= Maximum) & sumItemsPrice(Tail, Maximum, NewSum).
@@ -23,11 +25,17 @@ jobWorthIt(Reward, [], Sum) :- (Reward - Sum) > 150.
 buyingList([]).
 realLastAction(skip).
 
-+lastAction(Action) : lastActionResult(Result) & lastActionParams(Parameters) & 
-	(Result = useless) & not (Action = randomFail) & not (Result = successful_partial) & hasItem(Item, Quantity) 
++lastAction(Action) : lastActionResult(useless) & lastActionParams(Parameters) 
+	& not (Action = randomFail) & hasItem(Item, Quantity) 
 <-
 	.print("Item was already delivered. Discarding...");
 	+discardItemAtDump(Item, Quantity)
+	.
+
++lastAction(charge) : lastActionResult(failed_facility_state) 
+<-
+	.print("The charging station is currently out of order due to a blackout.");
+	charge;
 	.
 
 +lastAction(Action) : lastActionResult(Result) & lastActionParams(Parameters) & 
@@ -110,9 +118,9 @@ realLastAction(skip).
 
 +step(X) : true <- !choose_my_action(X).
 
-+!choose_my_action(Step) : lastAction(noAction) & realLastAction(Action)
++!choose_my_action(Step) : lastAction(noAction) & realLastAction(Action) & not stillWithPatience(Step) & not charging & not fullCharged
 <-
-	.print("Recovering from fail on action ",Action);	
+	.print("Recovering from fail on action. Last action: ", noAction, ". Real last action: ", Action);
 	Action;
 	.
 
@@ -153,9 +161,9 @@ realLastAction(skip).
 	!perform_action(continue);
 	.
 	
-+!choose_my_action(Step) : hasItem(_,_) & currentJob(_,Storage,_,_,_,_)
++!choose_my_action(Step) : hasItem(_,_) & currentJob(Job,Storage,_,_,_,_)
 <-
-	.print("Going delivery item at ",Storage);	
+	.print("Going delivery item at ", Storage, " for ", Job);	
 	!goto_facility(Storage);
 	.
 	
@@ -196,6 +204,12 @@ realLastAction(skip).
 	-goingToChargeStation;
 	+charging;
 	!perform_action(charge)
+	.
+
++!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_)  & (C = ChargeCapacity) & charging 
+<- 
+	.print("Full charged at ", Facility);
+	-charging;
 	.
 
 +!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_)  & (C = ChargeCapacity) & charging & going(Destiny) 
