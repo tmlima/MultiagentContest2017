@@ -20,7 +20,7 @@ sumItemsPrice([], Maximum, NewSum) :- true.
 jobWorthIt(Reward, RequiredItems) :- .length(RequiredItems, ItemsQuantity) & jobWorthIt(Reward, RequiredItems, 0, ItemsQuantity).
 jobWorthIt(Reward, [required(Item, Quantity)| Tail], Sum, ItemsQuantity) :- shop(_,_,_,_,Items) &  .member(item(Item,Price,Q), Items)
 	& ((Price * Quantity) + Sum) = NewSum & (NewSum < Reward)  & jobWorthIt(Reward, Tail, NewSum, ItemsQuantity).
-jobWorthIt(Reward, [], Sum, ItemsQuantity) :- ((Reward - Sum) / ItemsQuantity) > 40.
+jobWorthIt(Reward, [], Sum, ItemsQuantity) :- ((Reward - Sum) / ItemsQuantity) > 35.
 
 myBuyingList([]).
 realLastAction(skip).
@@ -34,8 +34,14 @@ realLastAction(skip).
 
 +lastAction(charge) : lastActionResult(failed_facility_state) 
 <-
-	.print("The charging station is currently out of order due to a blackout.");
+	.print("The charging station is currently out of order due to a blackout");
 	charge;
+	.
+
++lastAction(deliver_job) : lastActionResult(failed_job_status) & lastActionParams(JobName) 
+<-
+	.print("Job was already done by other team");
+	!quitJob(JobName);
 	.
 
 +lastAction(Action) : lastActionResult(Result) & lastActionParams(Parameters) & 
@@ -72,15 +78,20 @@ realLastAction(skip).
 +executingJob(Agent, Name,Storage,Reward,Begin,End,Requirements) : simStart[entity(Self),_] & (Agent \== Self) & currentJob(Name,_,_,_,_,_) & otherAgentHasPriority(Self, Agent)
 <- 
 	.print("I quit job ", Name, " because ", Agent, " is doing it"); 
-	.abolish(currentJob(Name,_,_,_,_,_));
-	.abolish(going(_));
-	-+myBuyingList([]);
+	!quitJob(Name);
 	!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements)
 	.	
 
 +executingJob(Agent, Name,Storage,Reward,Begin,End,Requirements) : simStart[entity(Self),_] & (Agent \== Self)
 <-
 	!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements).
+
++!quitJob(Name)
+<-
+	.abolish(currentJob(Name,_,_,_,_,_));
+	.abolish(going(_));
+	-+myBuyingList([])
+	.
 
 +!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements)
 <-
