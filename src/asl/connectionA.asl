@@ -17,10 +17,10 @@ otherAgentHasPriority(Self, OtherAgent) :- .min([Self, OtherAgent], Priority) & 
 sumItemsPrice([item(_,Price,_) | Tail], Maximum, Sum) :- (Sum + Price) = NewSum & (NewSum <= Maximum) & sumItemsPrice(Tail, Maximum, NewSum).
 sumItemsPrice([], Maximum, NewSum) :- true.
 
-jobWorthIt(Reward, RequiredItems) :- jobWorthIt(Reward, RequiredItems, 0).
-jobWorthIt(Reward, [required(Item, Quantity)| Tail], Sum) :- shop(_,_,_,_,Items) &  .member(item(Item,Price,Q), Items)
-	& ((Price * Quantity) + Sum) = NewSum & (NewSum < Reward)  & jobWorthIt(Reward, Tail, NewSum).
-jobWorthIt(Reward, [], Sum) :- (Reward - Sum) > 150.	
+jobWorthIt(Reward, RequiredItems) :- .length(RequiredItems, ItemsQuantity) & jobWorthIt(Reward, RequiredItems, 0, ItemsQuantity).
+jobWorthIt(Reward, [required(Item, Quantity)| Tail], Sum, ItemsQuantity) :- shop(_,_,_,_,Items) &  .member(item(Item,Price,Q), Items)
+	& ((Price * Quantity) + Sum) = NewSum & (NewSum < Reward)  & jobWorthIt(Reward, Tail, NewSum, ItemsQuantity).
+jobWorthIt(Reward, [], Sum, ItemsQuantity) :- ((Reward - Sum) / ItemsQuantity) > 40.
 
 buyingList([]).
 realLastAction(skip).
@@ -88,19 +88,9 @@ realLastAction(skip).
 	+executingJob(Agent, Name,Storage,Reward,Begin,End,Requirements)
 	.
 	
-+jobCompleted(Name)[source(Agent)] : true
-<- 
-	.print(Agent, " told me job ", Name, " is complete");
-	.abolish(executingJob(Name,_,_,_,_,_));
-	-going;
-	-jobCompleted(Name)[source(Agent)];
-	-waitingForJobBeComplete;
-	.
-
-+lastAction(deliver_job) : lastActionResult(successful) & currentJob(Name,_,_,_,_,_)
++lastAction(deliver_job) : lastActionResult(successful) & currentJob(Name,_,Reward,_,_,_)
 <-
-	.print("Job ", Name, " completed!");
-	.broadcast(tell,jobCompleted(Name));
+	.print("Job ", Name, " completed! Reward: ", Reward);
 	.abolish(currentJob(Name,_,_,_,_,_));
 	-going
 	.
@@ -206,14 +196,14 @@ realLastAction(skip).
 	!perform_action(charge)
 	.
 
-+!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_)  & (C = ChargeCapacity) & charging & going(Destiny) 
++!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & fullCharged & going(Destiny) 
 <- 
 	.print("Full charged at ", Facility);
 	-charging;
 	!goto_facility(Destiny)
 	.
 
-+!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_)  & (C = ChargeCapacity) & charging 
++!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & fullCharged
 <- 
 	.print("Full charged at ", Facility);
 	-charging;
