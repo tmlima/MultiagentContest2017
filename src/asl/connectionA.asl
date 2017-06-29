@@ -22,7 +22,7 @@ jobWorthIt(Reward, [required(Item, Quantity)| Tail], Sum, ItemsQuantity) :- shop
 	& ((Price * Quantity) + Sum) = NewSum & (NewSum < Reward)  & jobWorthIt(Reward, Tail, NewSum, ItemsQuantity).
 jobWorthIt(Reward, [], Sum, ItemsQuantity) :- ((Reward - Sum) / ItemsQuantity) > 40.
 
-buyingList([]).
+myBuyingList([]).
 realLastAction(skip).
 
 +lastAction(Action) : lastActionResult(useless) & lastActionParams(Parameters) 
@@ -66,7 +66,7 @@ realLastAction(skip).
 	.broadcast(tell,executingJob(Self, Name,Storage,Reward,Begin,End,Requirements));
 	-currentJob(_,_,_,_,_,_);
 	+currentJob(Name,Storage,Reward,Begin,End,Requirements);
-	-+buyingList(Requirements);
+	-+myBuyingList(Requirements);
 	.
 
 +executingJob(Agent, Name,Storage,Reward,Begin,End,Requirements) : simStart[entity(Self),_] & (Agent \== Self) & currentJob(Name,_,_,_,_,_) & otherAgentHasPriority(Self, Agent)
@@ -74,7 +74,7 @@ realLastAction(skip).
 	.print("I quit job ", Name, " because ", Agent, " is doing it"); 
 	.abolish(currentJob(Name,_,_,_,_,_));
 	.abolish(going(_));
-	-+buyingList([]);
+	-+myBuyingList([]);
 	!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements)
 	.	
 
@@ -157,7 +157,7 @@ realLastAction(skip).
 	!goto_facility(Storage);
 	.
 	
-+!choose_my_action(Step) : currentJob(_,_,_,_,_,_) & not buyingList([]) & buyingList(Requirements) & not hasItem(_,_)
++!choose_my_action(Step) : currentJob(_,_,_,_,_,_) & not myBuyingList([]) & myBuyingList(Requirements) & not hasItem(_,_)
 <-
 	.nth(0,Requirements,required(Item, Quantity));
 	!choose_shop_to_go_buying(Step, Item, Quantity);
@@ -181,7 +181,7 @@ realLastAction(skip).
 	!goto_facility(Shop);
 	.
 
-+!choose_item_to_buy(Step) : buyingList(Requirements) & .member(required(Item,Qtd),Requirements) & shopsHasItem(Item,Qtd,ShopList)
++!choose_item_to_buy(Step) : myBuyingList(Requirements) & .member(required(Item,Qtd),Requirements) & shopsHasItem(Item,Qtd,ShopList)
 <-
 	.print("Buying ", Item)
 	!perform_action(buy(Item,Qtd));
@@ -209,12 +209,12 @@ realLastAction(skip).
 	-charging;
 	.
 
-+!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & not buyingList([])
++!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & not myBuyingList([])
 <- 
 	!choose_item_to_buy(Step);
 	.
 
-+!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & buyingList([])
++!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & myBuyingList([])
 <-
 	.print("Buying list is empty. Waiting for another job");
 	+waitingForJobBeComplete;
@@ -233,7 +233,7 @@ realLastAction(skip).
 	-discardItemAtDump
 	.
 
-+!what_to_do_in_facility(Facility, Step) : hasItem(Item, Quantity) & buyingList(Requirements) & not .member(required(Item,_), Requirements)
++!what_to_do_in_facility(Facility, Step) : hasItem(Item, Quantity) & myBuyingList(Requirements) & not .member(required(Item,_), Requirements)
 <- 
 	.print("Item ", Item, " was already delivered");
 	+discardItemAtDump(Item, Quantity)
@@ -247,10 +247,10 @@ realLastAction(skip).
 	-+realLastAction(Action);
 	.
 
-+!updateBuyingList(Item,Qtd) : buyingList(List)
++!updateBuyingList(Item,Qtd) : myBuyingList(List)
 <-
 	.print("Removing ", Item, " from buying list");
 	.delete(required(Item,Qtd),List,NewList);
-	-+buyingList(NewList);
+	-+myBuyingList(NewList);
 	.
 	
