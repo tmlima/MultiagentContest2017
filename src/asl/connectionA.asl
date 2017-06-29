@@ -206,17 +206,17 @@ realLastAction(skip).
 	!perform_action(charge)
 	.
 
-+!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_)  & (C = ChargeCapacity) & charging 
-<- 
-	.print("Full charged at ", Facility);
-	-charging;
-	.
-
 +!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_)  & (C = ChargeCapacity) & charging & going(Destiny) 
 <- 
 	.print("Full charged at ", Facility);
 	-charging;
 	!goto_facility(Destiny)
+	.
+
++!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & charge(C) & role(_,_,_,ChargeCapacity,_)  & (C = ChargeCapacity) & charging 
+<- 
+	.print("Full charged at ", Facility);
+	-charging;
 	.
 
 +!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & not buyingList([])
