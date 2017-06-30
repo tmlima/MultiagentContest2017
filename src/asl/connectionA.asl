@@ -5,6 +5,11 @@ shopsHasItem(Item,Qtd,[shop(IdShop,ItensShop) | ListOfShops],Temp,Result) :- sho
 shopsHasItem(Item,Qtd,[shop(IdShop,ItensShop) | ListOfShops],Temp,Result) :- shopsHasItem(Item,Qtd,ListOfShops,Temp,Result).
 shopsHasItem(Item,Qtd,Result) :- .findall(shop(IdShop,ItensShop),shop(IdShop,_,_,_,ItensShop),ListOfShops) & shopsHasItem(Item,Qtd,ListOfShops,[],Result).
 
+itemPrices(Item,Qtd,[],Temp,Result) :- Result = Temp.
+itemPrices(Item,Qtd,[shop(IdShop,ItensShop) | ListOfShops],Temp,Result) :- .member(item(Item,Price,QtdInShop),ItensShop)& (Qtd <= QtdInShop) & itemPrices(Item,Qtd,ListOfShops,[Price | Temp],Result).
+itemPrices(Item,Qtd,[shop(IdShop,ItensShop) | ListOfShops],Temp,Result) :- itemPrices(Item,Qtd,ListOfShops,Temp,Result).
+itemPrices(Item,Qtd,Result) :- .findall(shop(IdShop,ItensShop),shop(IdShop,_,_,_,ItensShop),ListOfShops) & itemPrices(Item,Qtd,ListOfShops,[],Result).
+
 distanceHeuristic(TargetLat, TargetLon, Distance) :- lat(CurrentLat) & lon(CurrentLon) & Distance = 
 	math.sqrt(((TargetLat - CurrentLat) * (TargetLat - CurrentLat)) + ((TargetLon - CurrentLon) * (TargetLon - CurrentLon))).
 
@@ -116,7 +121,7 @@ realLastAction(skip).
 <- 
 	.print("Full charged");
 	-chargingSolarPanels.
-
+	
 +step(X) : true <- !choose_my_action(X).
 
 +!choose_my_action(Step) : lastAction(noAction) & realLastAction(Action) & not stillWithPatience(Step) & not charging & not fullCharged
@@ -186,7 +191,7 @@ realLastAction(skip).
 	!perform_action(goto(Facility));	
 	.
 
-+!choose_shop_to_go_buying(Step, Item, Quantity) : shop(Shop,_,_,_,ShopItems) & .member(item(Item,_,StockQuantity),ShopItems) & (Quantity <= StockQuantity)
++!choose_shop_to_go_buying(Step, Item, Quantity) : itemPrices(Item, Quantity, Prices) & .min(Prices, LowestPrice) & shop(Shop,_,_,_,ShopItems) & .member(item(Item,LowestPrice,StockQuantity),ShopItems) & (Quantity <= StockQuantity)
 <-
 	.print("Going to buy ", Item, " on ", Shop);
 	!goto_facility(Shop);
