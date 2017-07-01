@@ -31,10 +31,10 @@ myBuyingList([]).
 realLastAction(skip).
 
 +lastAction(Action) : lastActionResult(useless) & lastActionParams(Parameters) 
-	& not (Action = randomFail) & hasItem(Item, Quantity) 
+	& not (Action = randomFail) & hasItem(Item, Quantity) & currentJob(Name,_,_,_,_,_)
 <-
 	.print("Item was already delivered. Discarding...");
-	+discardItemAtDump(Item, Quantity)
+	!quitJob(Name);
 	.
 
 +lastAction(charge) : lastActionResult(failed_facility_state) 
@@ -43,10 +43,10 @@ realLastAction(skip).
 	charge;
 	.
 
-+lastAction(deliver_job) : lastActionResult(failed_job_status) & lastActionParams(JobName) 
++lastAction(deliver_job) : lastActionResult(failed_job_status) & lastActionParams(JobName) & currentJob(Name,_,_,_,_,_)
 <-
 	.print("Job was already done by other team");
-	!quitJob(JobName);
+	!quitJob(Name);
 	.
 
 +lastAction(Action) : lastActionResult(Result) & lastActionParams(Parameters) & 
@@ -90,6 +90,14 @@ realLastAction(skip).
 +executingJob(Agent, Name,Storage,Reward,Begin,End,Requirements) : simStart[entity(Self),_] & (Agent \== Self)
 <-
 	!updateAgentJobInformation(Agent, Name,Storage,Reward,Begin,End,Requirements).
+
++!quitJob(Name) : hasItem(Item, Quantity)
+<-
+	.abolish(currentJob(Name,_,_,_,_,_));
+	.abolish(going(_));
+	-+myBuyingList([]);
+	+discardItemAtDump(Item, Quantity)
+	.
 
 +!quitJob(Name)
 <-
@@ -164,7 +172,7 @@ realLastAction(skip).
 
 +!choose_my_action(Step) : going(Destination)
 <-
-	!perform_action(continue);
+	!goto_facility(Destination)
 	.
 	
 +!choose_my_action(Step) : hasItem(_,_) & currentJob(Job,Storage,_,_,_,_)
@@ -179,7 +187,7 @@ realLastAction(skip).
 	!choose_shop_to_go_buying(Step, Item, Quantity);
 	.
 	
-+!choose_my_action(Step) :true
++!choose_my_action(Step) : true
 <-
 	.print("I'm doing nothing at step ",Step);
 	!perform_action(skip);
@@ -216,7 +224,6 @@ realLastAction(skip).
 <- 
 	.print("Full charged at ", Facility);
 	-charging;
-	!goto_facility(Destiny)
 	.
 
 +!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & fullCharged
@@ -245,14 +252,14 @@ realLastAction(skip).
 +!what_to_do_in_facility(Facility, Step) : discardItemAtDump(Item, Quantity) & dump(Facility,_,_) & hasItem(Item, Quantity)
 <-
 	.print("Discarding ", Item, " at ", Facility);
-	dump(Item, Quantity);
 	-discardItemAtDump
+	dump(Item, Quantity);
 	.
 
-+!what_to_do_in_facility(Facility, Step) : hasItem(Item, Quantity) & myBuyingList(Requirements) & not .member(required(Item,_), Requirements)
++!what_to_do_in_facility(Facility, Step) : currentJob(Name,_,_,_,_,_) & hasItem(Item, Quantity) & myBuyingList(Requirements) & not .member(required(Item,_), Requirements)
 <- 
 	.print("Item ", Item, " was already delivered");
-	+discardItemAtDump(Item, Quantity)
+	!quitJob(Name);
 	.		
 
 +!perform_action(continue) <- continue.
