@@ -19,9 +19,6 @@ fullCharged :- charge(Charge) & role(_,_,_,ChargeCapacity,_) & (Charge = ChargeC
 
 otherAgentHasPriority(Self, OtherAgent) :- .min([Self, OtherAgent], Priority) & Priority = OtherAgent.
 
-sumItemsPrice([item(_,Price,_) | Tail], Maximum, Sum) :- (Sum + Price) = NewSum & (NewSum <= Maximum) & sumItemsPrice(Tail, Maximum, NewSum).
-sumItemsPrice([], Maximum, NewSum) :- true.
-
 jobWorthIt(Reward, RequiredItems) :- .length(RequiredItems, ItemsQuantity) & jobWorthIt(Reward, RequiredItems, 0, ItemsQuantity).
 jobWorthIt(Reward, [required(Item, Quantity)| Tail], Sum, ItemsQuantity) :- shop(_,_,_,_,Items) &  .member(item(Item,Price,Q), Items)
 	& ((Price * Quantity) + Sum) = NewSum & (NewSum < Reward)  & jobWorthIt(Reward, Tail, NewSum, ItemsQuantity).
@@ -125,14 +122,16 @@ realLastAction(skip).
 	!updateBuyingList(Item,Quantity);
 	.
 	
-+charge(C) : role(_,_,_,ChargeCapacity,_) & (C = ChargeCapacity) & chargingSolarPanels
++charge(C) : fullCharged
 <- 
 	.print("Full charged");
-	-chargingSolarPanels.
-	
+	-chargingSolarPanels;
+	-charging;
+	.
+
 +step(X) : true <- !choose_my_action(X).
 
-+!choose_my_action(Step) : lastAction(noAction) & realLastAction(Action) & not stillWithPatience(Step) & not charging & not fullCharged
++!choose_my_action(Step) : lastAction(noAction) & realLastAction(Action) & not charging & not fullCharged
 <-
 	.print("Recovering from fail on action. Last action: ", noAction, ". Real last action: ", Action);
 	Action;
@@ -177,7 +176,7 @@ realLastAction(skip).
 	
 +!choose_my_action(Step) : hasItem(_,_) & currentJob(Job,Storage,_,_,_,_)
 <-
-	.print("Going delivery item at ", Storage, " for ", Job);	
+	.print("Delivering item at ", Storage, " for ", Job);	
 	!goto_facility(Storage);
 	.
 	
@@ -201,7 +200,7 @@ realLastAction(skip).
 
 +!choose_shop_to_go_buying(Step, Item, Quantity) : itemPrices(Item, Quantity, Prices) & .min(Prices, LowestPrice) & shop(Shop,_,_,_,ShopItems) & .member(item(Item,LowestPrice,StockQuantity),ShopItems) & (Quantity <= StockQuantity)
 <-
-	.print("Going to buy ", Item, " on ", Shop);
+	.print("Going to buy ", Item, " at ", Shop);
 	!goto_facility(Shop);
 	.
 
@@ -220,32 +219,17 @@ realLastAction(skip).
 	!perform_action(charge)
 	.
 
-+!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & fullCharged & going(Destiny) 
-<- 
-	.print("Full charged at ", Facility);
-	-charging;
-	.
-
-+!what_to_do_in_facility(Facility, Step) : chargingStation(Facility,_,_,_) & fullCharged
-<- 
-	.print("Full charged at ", Facility);
-	-charging;
-	.
-
 +!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & not myBuyingList([])
 <- 
-	!choose_item_to_buy(Step);
-	.
+	!choose_item_to_buy(Step).
 
 +!what_to_do_in_facility(Facility, Step) : shop(Facility,_,_,_,ListOfItems) & myBuyingList([])
 <-
-	.print("Buying list is empty. Waiting for another job");
-	+waitingForJobBeComplete;
-	.
+	.print("Buying list is empty. Waiting for another job").
 	
 +!what_to_do_in_facility(Facility, Step) : storage(Facility,_,_,_,_,_) & currentJob(Name,_,_,_,_,_) & hasItem(Item, Quantity)
 <- 
-	.print("Delivering ",Quantity, " of ", Item, " on ", Facility);
+	.print("Delivering ",Quantity, " of ", Item, " at ", Facility);
 	!perform_action(deliver_job(Name));
 	.
 
